@@ -1,4 +1,5 @@
 import os
+from google.genai import types
 from .config import MAX_CHARS
 
 def get_file_content(working_directory, file_path):
@@ -13,7 +14,7 @@ def get_file_content(working_directory, file_path):
     
     # Ensure file is a file and not a directory
     if os.path.isfile(abs_target_file) == False:
-        return f'Error: File not found or is not a regular file: "{directory}"'
+        return f'Error: File not found or is not a regular file: "{file_path}"'
     
     # Read file up to MAX_CHARS
     try:
@@ -24,3 +25,18 @@ def get_file_content(working_directory, file_path):
             return file_content
     except Exception as e:
         return f'Error: {str(e)}'
+    
+schema_get_file_content = types.FunctionDeclaration(
+    name="get_file_content",
+    description="Read content from a specific file, constrained to the working directory.",
+    parameters=types.Schema(
+        type=types.Type.OBJECT,
+        properties={
+            "file_path": types.Schema(
+                type=types.Type.STRING,
+                description="The file being read, relative to the working directory.",
+            ),
+        },
+        required=["file_path"],
+    ),
+)

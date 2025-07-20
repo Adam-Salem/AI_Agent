@@ -11,3 +11,9 @@ wheels/
 
 # API Key
 .env
+
+# Test files
+lorem.txt
+calculator/pkg/morelorem.txt
+calculator/lorem.txt
+main.txt
