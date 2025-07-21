@@ -45,23 +45,6 @@ def call_function(function_call, verbose=False):
                     name=function_call.name,
                     response={"result": function_result})])
 
-# def call_function(*args, **kwargs):
-#     class FakePart:
-#         function_response = type('FR', (), {'response': {'result': "Fake tool function result"}})()
-#     return type('FResult', (), {'parts': [FakePart()]})()
-
-# def fake_generate_content(*args, **kwargs):
-#     class FakeCandidate:
-#         def __init__(self, text):
-#             self.content = types.Content(role="model", parts=[types.Part(text=text)])
-#             self.finish_reason = "stop"
-#     # Simulate what Gemini would return
-#     class Response:
-#         candidates = [FakeCandidate("Fake model reply!")]
-#         function_calls = []
-#         usage_metadata = type('um', (), {'prompt_token_count': 0, 'candidates_token_count': 0})()
-#     return Response()
-
 system_prompt = """
 You are a helpful AI coding agent.
 
@@ -70,12 +53,13 @@ When a user asks a question or makes a request, make a function call plan. You c
 - List files and directories
 - Read file contents
 - Execute Python files with optional arguments
-- Write or overwrite files
+- Write or overwrite files (BE VERY CONSERVATIVE ABOUT OVERWRITING EXISTING FILES)
 
 Always call get_files_info before trying to do any other functions to understand the directory structure. Any file you try to read, write, or execute must have the proper relative path.
 All paths you provide should be relative to the working directory. You do not need to specify the working directory in your function calls as it is automatically injected for security reasons.
 
 If a function call fails, analyze the error and adjust your approach rather than repeating the same failed operation.
+After gathering information or fulfilling a request, give the user a detailed and conclusive answer on your findings.
 """
 
 load_dotenv()
@@ -101,6 +85,7 @@ available_functions = types.Tool(
 messages = [types.Content(role="user", parts=[types.Part(text=prompt)])]
 loop_counter = 0
 done = False
+final_answer = None
 
 while(loop_counter < 20):
     try:
@@ -115,6 +100,7 @@ while(loop_counter < 20):
         if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
             print(f"Rate limit hit. Waiting 60 seconds before retry...")
             time.sleep(60)
+            print("Retrying...")
             continue
         else:
             print(f"API error: {e}")
@@ -125,12 +111,6 @@ while(loop_counter < 20):
 
     for candidate in response.candidates:
         messages.append(candidate.content)
-        if getattr(candidate, "finish_reason", None) == "stop":
-            print(candidate.content.parts[0].text)
-            done = True
-            break
-    if done:
-        break
 
     if response.function_calls:
         for function_calls_part in response.function_calls:
@@ -142,10 +122,16 @@ while(loop_counter < 20):
                 print(f"-> {func_result.parts[0].function_response.response}")
             except Exception as e:
                 print(f"Error occurred: {e}")
+    else:
+        if response.text:
+            final_answer = response.text
+            break
     if verbose:
         print("User prompt:", prompt)
         print("Prompt tokens:", response.usage_metadata.prompt_token_count)
         print("Response tokens:", response.usage_metadata.candidates_token_count)
+        
     loop_counter+=1
-for msg in messages:
-    print(msg)
+    
+if final_answer:
+    print(final_answer)
